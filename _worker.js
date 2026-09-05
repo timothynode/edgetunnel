@@ -276,9 +276,13 @@ export default {
 						} else if (区分大小写访问路径 === 'admin/ADD.txt') { // 保存自定义优选IP
 							try {
 								const customIPs = await request.text();
-								await env.KV.put('ADD.txt', customIPs);// 保存到 KV
+								const 请求运营商 = url.searchParams.get('isp');
+								const 运营商代码 = 规范化运营商代码(请求运营商);
+								if (请求运营商 && !运营商代码) return new Response(JSON.stringify({ error: 'isp 仅支持 cu、ct、cmcc、cf' }), { status: 400, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
+								const KV键 = 获取优选池KV键(运营商代码);
+								await env.KV.put(KV键, customIPs);// 保存到 KV
 								ctx.waitUntil(请求日志记录(env, request, 访问IP, 'Save_Custom_IPs', config_JSON));
-								return new Response(JSON.stringify({ success: true, message: '自定义IP已保存' }), { status: 200, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
+								return new Response(JSON.stringify({ success: true, message: '自定义IP已保存', pool: 运营商代码 || 'legacy', key: KV键 }), { status: 200, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
 							} catch (error) {
 								console.error('保存自定义IP失败:', error);
 								return new Response(JSON.stringify({ error: '保存自定义IP失败: ' + error.message }), { status: 500, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
@@ -287,9 +291,14 @@ export default {
 					} else if (访问路径 === 'admin/config.json') {// 处理 admin/config.json 请求，返回JSON
 						return new Response(JSON.stringify(config_JSON, null, 2), { status: 200, headers: { 'Content-Type': 'application/json' } });
 					} else if (区分大小写访问路径 === 'admin/ADD.txt') {// 处理 admin/ADD.txt 请求，返回本地优选IP
-						let 本地优选IP = await env.KV.get('ADD.txt') || 'null';
-						if (本地优选IP == 'null') 本地优选IP = (await 生成随机IP(request, config_JSON.优选订阅生成.本地IP库.随机数量, config_JSON.优选订阅生成.本地IP库.指定端口))[1];
-						return new Response(本地优选IP, { status: 200, headers: { 'Content-Type': 'text/plain;charset=utf-8', 'asn': request.cf.asn } });
+						const 请求运营商 = url.searchParams.get('isp');
+						const 运营商代码 = 规范化运营商代码(请求运营商);
+						if (请求运营商 && !运营商代码) return new Response('isp 仅支持 cu、ct、cmcc、cf', { status: 400, headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
+						let 本地优选IP;
+						if (url.searchParams.get('effective') === '1') 本地优选IP = (await 读取自定义优选IP(env, request, config_JSON)).join('\n');
+						else 本地优选IP = await env.KV.get(获取优选池KV键(运营商代码)) || '';
+						if (!请求运营商 && !本地优选IP) 本地优选IP = (await 生成随机IP(request, config_JSON.优选订阅生成.本地IP库.随机数量, config_JSON.优选订阅生成.本地IP库.指定端口))[1];
+						return new Response(本地优选IP, { status: 200, headers: { 'Content-Type': 'text/plain;charset=utf-8', 'asn': String(request.cf?.asn || ''), 'x-edgetunnel-pool': 运营商代码 || (url.searchParams.get('effective') === '1' ? 'effective' : 'legacy') } });
 					} else if (访问路径 === 'admin/cf.json') {// CF配置文件
 						return new Response(JSON.stringify(request.cf, null, 2), { status: 200, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
 					}
@@ -353,11 +362,10 @@ export default {
 							let 完整优选IP = [], 其他节点LINK = '', 反代IP池 = [];
 
 							if (!url.searchParams.has('sub') && config_JSON.优选订阅生成.local) { // 本地生成订阅
-								const 完整优选列表 = config_JSON.优选订阅生成.本地IP库.随机IP ? (
-									await 生成随机IP(request, config_JSON.优选订阅生成.本地IP库.随机数量, config_JSON.优选订阅生成.本地IP库.指定端口)
-								)[0] : await env.KV.get('ADD.txt') ? await 整理成数组(await env.KV.get('ADD.txt')) : (
-									await 生成随机IP(request, config_JSON.优选订阅生成.本地IP库.随机数量, config_JSON.优选订阅生成.本地IP库.指定端口)
-								)[0];
+								const 自定义优选列表 = config_JSON.优选订阅生成.本地IP库.随机IP ? [] : await 读取自定义优选IP(env, request, config_JSON);
+								const 完整优选列表 = config_JSON.优选订阅生成.本地IP库.随机IP
+									? (await 生成随机IP(request, config_JSON.优选订阅生成.本地IP库.随机数量, config_JSON.优选订阅生成.本地IP库.指定端口))[0]
+									: 自定义优选列表.length > 0 ? 自定义优选列表 : (await 生成随机IP(request, config_JSON.优选订阅生成.本地IP库.随机数量, config_JSON.优选订阅生成.本地IP库.指定端口))[0];
 								const 优选API = [], 优选IP = [], 其他节点 = [];
 								for (const 元素 of 完整优选列表) {
 									if (元素.toLowerCase().startsWith('sub://')) {
@@ -393,7 +401,7 @@ export default {
 								完整优选IP = [...new Set(优选IP.concat(优选API的IP))];
 							} else { // 优选订阅生成器
 								let 优选订阅生成器HOST = url.searchParams.get('sub') || config_JSON.优选订阅生成.SUB;
-								const [优选生成器IP数组, 优选生成器其他节点] = await 获取优选订阅生成器数据(优选订阅生成器HOST);
+								const [优选生成器IP数组, 优选生成器其他节点] = await 获取优选订阅生成器数据(优选订阅生成器HOST, 获取请求运营商(request));
 								完整优选IP = 完整优选IP.concat(优选生成器IP数组);
 								其他节点LINK += 优选生成器其他节点;
 							}
@@ -5099,6 +5107,13 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 				随机IP: true, // 当 随机IP 为true时生效，启用随机IP的数量，否则使用KV内的ADD.txt
 				随机数量: 16,
 				指定端口: -1,
+				多运营商: {
+					启用: true, // KV存在ADD-cu.txt等分池时自动组合；无分池时保持ADD.txt旧行为
+					首选数量: 8,
+					通用池数量: 2,
+					其他池数量: 4,
+					旧池数量: 2,
+				},
 			},
 			SUB: null,
 			SUBNAME: "edge" + "tunnel",
@@ -5195,6 +5210,7 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 	config_JSON.UUID = userID;
 	if (!config_JSON.随机路径) config_JSON.随机路径 = false;
 	if (!config_JSON.启用0RTT) config_JSON.启用0RTT = false;
+	if (!config_JSON.优选订阅生成.本地IP库.多运营商) config_JSON.优选订阅生成.本地IP库.多运营商 = { 启用: true, 首选数量: 8, 通用池数量: 2, 其他池数量: 4, 旧池数量: 2 };
 
 	if (env.PATH) config_JSON.PATH = env.PATH.startsWith('/') ? env.PATH : '/' + env.PATH;
 	else if (!config_JSON.PATH) config_JSON.PATH = '/';
@@ -5324,6 +5340,7 @@ function 识别运营商(request) {
 		'4837': 'cu',
 		'4814': 'cu',
 		'9929': 'cu',
+		'17622': 'cu',
 		'17623': 'cu',
 		'17816': 'cu',
 		'9808': 'cmcc',
@@ -5343,10 +5360,79 @@ function 识别运营商(request) {
 	return 命中运营商 || ASN运营商映射[String(cf?.asn || '')] || 'cf';
 }
 
+function 规范化运营商代码(value) {
+	const code = String(value || '').trim().toLowerCase();
+	return ['ct', 'cu', 'cmcc', 'cf'].includes(code) ? code : null;
+}
+
+function 获取请求运营商(request) {
+	try {
+		const searchParams = new URL(request.url).searchParams;
+		const 查询参数运营商 = 规范化运营商代码(searchParams.get('cnIspCode')) || 规范化运营商代码(searchParams.get('isp'));
+		return 查询参数运营商 || 识别运营商(request);
+	} catch {
+		return 识别运营商(request);
+	}
+}
+
+function 获取优选池KV键(运营商代码 = null) {
+	return 运营商代码 ? `ADD-${运营商代码}.txt` : 'ADD.txt';
+}
+
+function 限制优选池数量(value, 默认值, 最小值 = 0, 最大值 = 99) {
+	const number = Number(value);
+	if (!Number.isFinite(number)) return 默认值;
+	return Math.min(最大值, Math.max(最小值, Math.floor(number)));
+}
+
+function 去重优选列表(items) {
+	const seen = new Set(), result = [];
+	for (const item of items) {
+		const text = String(item || '').trim();
+		if (!text) continue;
+		const key = text.split('#')[0].trim().toLowerCase();
+		if (!key || seen.has(key)) continue;
+		seen.add(key);
+		result.push(text);
+	}
+	return result;
+}
+
+async function 读取优选池(env, 运营商代码 = null) {
+	const 内容 = await env.KV.get(获取优选池KV键(运营商代码));
+	return 内容 && String(内容).trim() ? (await 整理成数组(String(内容))).map(item => item.trim()).filter(Boolean) : [];
+}
+
+async function 读取自定义优选IP(env, request, config = {}) {
+	const 本地IP库配置 = config?.优选订阅生成?.本地IP库 || {};
+	const 多运营商配置 = 本地IP库配置.多运营商 || {};
+	const [旧池, ...分池列表] = await Promise.all([
+		读取优选池(env),
+		...['ct', 'cu', 'cmcc', 'cf'].map(code => 读取优选池(env, code)),
+	]);
+	const 分池 = Object.fromEntries(['ct', 'cu', 'cmcc', 'cf'].map((code, index) => [code, 分池列表[index]]));
+	const 存在分池 = Object.values(分池).some(items => items.length > 0);
+	if (多运营商配置.启用 === false || !存在分池) return 去重优选列表(旧池);
+
+	const 当前运营商 = 获取请求运营商(request);
+	const 首选数量 = 限制优选池数量(多运营商配置.首选数量, 8, 1);
+	const 通用池数量 = 限制优选池数量(多运营商配置.通用池数量, 2);
+	const 其他池数量 = 限制优选池数量(多运营商配置.其他池数量, 4);
+	const 旧池数量 = 限制优选池数量(多运营商配置.旧池数量, 2);
+	const result = [];
+
+	if (分池[当前运营商].length > 0) result.push(...分池[当前运营商].slice(0, 首选数量));
+	else result.push(...(await 生成随机IP(request, 首选数量, 本地IP库配置.指定端口))[0]);
+	if (当前运营商 !== 'cf') result.push(...分池.cf.slice(0, 通用池数量));
+	for (const code of ['ct', 'cu', 'cmcc']) {
+		if (code !== 当前运营商) result.push(...分池[code].slice(0, 其他池数量));
+	}
+	result.push(...旧池.slice(0, 旧池数量));
+	return 去重优选列表(result);
+}
+
 async function 生成随机IP(request, count = 16, 指定端口 = -1) {
-	const url = new URL(request.url);
-	const 查询参数运营商 = String(url.searchParams.get('cnIspCode') || '').toLowerCase();
-	const 运营商文件标识 = ['ct', 'cu', 'cmcc', 'cf'].includes(查询参数运营商) ? 查询参数运营商 : 识别运营商(request);
+	const 运营商文件标识 = 获取请求运营商(request);
 	const 运营商名称映射 = {
 		cmcc: 'CF移动优选',
 		cu: 'CF联通优选',
@@ -5384,19 +5470,24 @@ async function 整理成数组(内容) {
 	return 地址数组;
 }
 
-async function 获取优选订阅生成器数据(优选订阅生成器HOST) {
-	let 优选IP = [], 其他节点LINK = '', 格式化HOST = 优选订阅生成器HOST.replace(/^sub:\/\//i, 'https://').split('#')[0].split('?')[0];
+async function 获取优选订阅生成器数据(优选订阅生成器HOST, 请求运营商 = null) {
+	let 优选IP = [], 其他节点LINK = '', 格式化HOST = 优选订阅生成器HOST.replace(/^sub:\/\//i, 'https://').split('#')[0];
 	if (!/^https?:\/\//i.test(格式化HOST)) 格式化HOST = `https://${格式化HOST}`;
+	let URL指定运营商 = null;
 
 	try {
 		const url = new URL(格式化HOST);
+		URL指定运营商 = 规范化运营商代码(url.searchParams.get('cnIspCode'));
 		格式化HOST = url.origin;
 	} catch (error) {
 		优选IP.push(`127.0.0.1:1234#${优选订阅生成器HOST}优选订阅生成器格式化异常:${error.message}`);
 		return [优选IP, 其他节点LINK];
 	}
 
-	const 优选订阅生成器URL = `${格式化HOST}/sub?host=example.com&uuid=00000000-0000-4000-8000-000000000000`;
+	const 生成器请求参数 = new URLSearchParams({ host: 'example.com', uuid: '00000000-0000-4000-8000-000000000000' });
+	const 有效运营商 = 规范化运营商代码(请求运营商) || URL指定运营商;
+	if (有效运营商) 生成器请求参数.set('cnIspCode', 有效运营商);
+	const 优选订阅生成器URL = `${格式化HOST}/sub?${生成器请求参数.toString()}`;
 
 	try {
 		const response = await fetch(优选订阅生成器URL, {

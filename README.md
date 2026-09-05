@@ -138,6 +138,45 @@
 1. 修改`ADMIN`或`KEY`变量的值，可以随机修改 **订阅地址里的TOKEN** 和 **用于节点验证的UUID**
 2. 设置`UUID`变量可以强制固定 **订阅地址里的TOKEN** 和 **用于节点验证的UUID**，注意必须是**UUIDv4**标准格式，否则会导致节点无法使用。
 
+### 多运营商自定义优选池
+
+当设备会在联通、电信、移动等网络之间切换时，不建议把所有实测结果都写入同一个 `ADD.txt`。本项目支持以下 KV 键：
+
+| KV 键 | 用途 |
+| :--- | :--- |
+| `ADD-cu.txt` | 联通实测优选地址 |
+| `ADD-ct.txt` | 电信实测优选地址 |
+| `ADD-cmcc.txt` | 移动实测优选地址 |
+| `ADD-cf.txt` | 通用 Cloudflare 兜底地址 |
+| `ADD.txt` | 兼容旧版的通用兜底地址 |
+
+登录管理后台后，可在浏览器开发者工具 Console 中按当前网络保存本地实测结果：
+
+```js
+await fetch('/admin/ADD.txt?isp=cu', {
+  method: 'POST',
+  body: `104.26.0.1:443#广州联通实测1
+172.67.64.1:443#广州联通实测2`
+}).then(r => r.json())
+```
+
+将 `isp=cu` 分别替换成 `ct`、`cmcc`、`cf` 即可维护其他池。读取单个池或预览组合后的实际下发结果：
+
+```js
+await fetch('/admin/ADD.txt?isp=cu').then(r => r.text())
+await fetch('/admin/ADD.txt?isp=cu&effective=1').then(r => r.text())
+```
+
+只要任一分池存在且后台选择“自定义订阅”，Worker 就会自动启用多运营商组合：当前运营商池优先，附带少量其他运营商和通用池作为切网兜底。没有任何分池时，仍保持原 `ADD.txt` 行为。
+
+仓库附带一个不依赖第三方包的入口 TLS 测速脚本。应在实际使用网络下运行，并把 `--host` 替换成自己的 Worker/Pages 域名：
+
+```bash
+node scripts/optimize-cf-pool.mjs --host worker.example.com --isp cu --count 128 --rounds 3 --top 8 --port 443 > ADD-cu.txt
+```
+
+该脚本按成功率、中位 TTFB 和 P95 抖动筛选地址；它验证的是本机到 Cloudflare/Worker 入口链路，不代表完整代理吞吐量。切换到电信后应重新使用 `--isp ct` 测量并保存到 `ADD-ct.txt`。
+
 本工具支持通过 **PATH路径** 动态切换底层代理方案：
 
 - 指定 `PROXYIP` 案例
