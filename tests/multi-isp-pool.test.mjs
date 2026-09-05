@@ -132,6 +132,16 @@ assert.match(missingCtPool[0], /^198\.51\.100\.\d{1,3}:443#CF电信优选1$/);
 assert.equal(missingCtPool[3], '10.0.0.1:443#cu-1');
 assert.equal(missingCtPool[4], '192.0.2.1:443#legacy-1');
 
+const isolatedDefaultCtPool = await 读取自定义优选IP(
+	{ KV: makeKV({ 'ADD.txt': pools['ADD.txt'], 'ADD-cu.txt': pools['ADD-cu.txt'] }) },
+	makeRequest({ country: 'CN', asn: 17622 }, 'https://worker.example/admin/ADD.txt?isp=ct&effective=1'),
+	{ 优选订阅生成: { 本地IP库: { 指定端口: 443, 多运营商: { 启用: true } } } },
+);
+assert.equal(isolatedDefaultCtPool.length, 10);
+assert.equal(isolatedDefaultCtPool.some(item => item.includes('#cu-')), false);
+assert.equal(isolatedDefaultCtPool.at(-2), '192.0.2.1:443#legacy-1');
+assert.equal(isolatedDefaultCtPool.at(-1), '192.0.2.2:443#legacy-2');
+
 await 获取优选订阅生成器数据('sub://generator.example/path?cnIspCode=ct#generator');
 const generatorUrl = new URL(fetchedUrls.find(url => url.startsWith('https://generator.example/sub?')));
 assert.equal(generatorUrl.searchParams.get('cnIspCode'), 'ct');

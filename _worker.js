@@ -5111,7 +5111,7 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 					启用: true, // KV存在ADD-cu.txt等分池时自动组合；无分池时保持ADD.txt旧行为
 					首选数量: 8,
 					通用池数量: 2,
-					其他池数量: 4,
+					其他池数量: 0,
 					旧池数量: 2,
 				},
 			},
@@ -5210,7 +5210,7 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 	config_JSON.UUID = userID;
 	if (!config_JSON.随机路径) config_JSON.随机路径 = false;
 	if (!config_JSON.启用0RTT) config_JSON.启用0RTT = false;
-	if (!config_JSON.优选订阅生成.本地IP库.多运营商) config_JSON.优选订阅生成.本地IP库.多运营商 = { 启用: true, 首选数量: 8, 通用池数量: 2, 其他池数量: 4, 旧池数量: 2 };
+	if (!config_JSON.优选订阅生成.本地IP库.多运营商) config_JSON.优选订阅生成.本地IP库.多运营商 = { 启用: true, 首选数量: 8, 通用池数量: 2, 其他池数量: 0, 旧池数量: 2 };
 
 	if (env.PATH) config_JSON.PATH = env.PATH.startsWith('/') ? env.PATH : '/' + env.PATH;
 	else if (!config_JSON.PATH) config_JSON.PATH = '/';
@@ -5417,7 +5417,7 @@ async function 读取自定义优选IP(env, request, config = {}) {
 	const 当前运营商 = 获取请求运营商(request);
 	const 首选数量 = 限制优选池数量(多运营商配置.首选数量, 8, 1);
 	const 通用池数量 = 限制优选池数量(多运营商配置.通用池数量, 2);
-	const 其他池数量 = 限制优选池数量(多运营商配置.其他池数量, 4);
+	const 其他池数量 = 限制优选池数量(多运营商配置.其他池数量, 0);
 	const 旧池数量 = 限制优选池数量(多运营商配置.旧池数量, 2);
 	const result = [];
 
