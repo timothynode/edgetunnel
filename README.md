@@ -177,6 +177,8 @@ node scripts/optimize-cf-pool.mjs --host worker.example.com --isp cu --count 128
 
 该脚本按成功率、中位 TTFB 和 P95 抖动筛选地址；它验证的是本机到 Cloudflare/Worker 入口链路，不代表完整代理吞吐量。切换到电信后应重新使用 `--isp ct` 测量并保存到 `ADD-ct.txt`。
 
+Clash、Sing-box 等格式需要经过订阅转换器；Worker 会给内部 mixed 订阅附加 5 分钟缓存版本，避免切网或更新分池后长期拿到转换器的旧缓存。
+
 本工具支持通过 **PATH路径** 动态切换底层代理方案：
 
 - 指定 `PROXYIP` 案例
