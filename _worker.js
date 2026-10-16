@@ -6230,6 +6230,9 @@ async function html1101(host, 访问IP) {
 // Preserve protocol responses; report only failures thrown before a response is returned.
 export default {
 	async fetch(request, env, ctx) {
+		if (request.method === 'GET' && new URL(request.url).pathname === '/__edgetunnel_entry_probe_20261016') {
+			return new Response('entry-ok', { headers: { 'Cache-Control': 'no-store', 'Content-Type': 'text/plain;charset=utf-8' } });
+		}
 		try { return await EdgeTunnelWorker.fetch(request, env, ctx) }
 		catch (error) {
 			console.error('[EdgeTunnel] request handler failed', error?.stack || String(error));
