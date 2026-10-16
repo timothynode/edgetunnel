@@ -35,6 +35,8 @@ fallthrough = false
 [[routes]]
 pattern = "g5gx9c.nocal.host"
 custom_domain = true
+enabled = true
+previews_enabled = false
 
 [[kv_namespaces]]
 binding = "KV"
