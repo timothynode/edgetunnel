@@ -11,6 +11,26 @@ type = "ESModule"
 globs = ["**/_worker.js"]
 fallthrough = false
 
+[[rules]]
+type = "CommonJS"
+globs = []
+fallthrough = false
+
+[[rules]]
+type = "CompiledWasm"
+globs = []
+fallthrough = false
+
+[[rules]]
+type = "Text"
+globs = []
+fallthrough = false
+
+[[rules]]
+type = "Data"
+globs = []
+fallthrough = false
+
 [[routes]]
 pattern = "g5gx9c.nocal.host"
 custom_domain = true

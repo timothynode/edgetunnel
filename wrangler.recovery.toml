@@ -13,6 +13,26 @@ type = "ESModule"
 globs = ["**/_worker.js"]
 fallthrough = false
 
+[[rules]]
+type = "CommonJS"
+globs = []
+fallthrough = false
+
+[[rules]]
+type = "CompiledWasm"
+globs = []
+fallthrough = false
+
+[[rules]]
+type = "Text"
+globs = []
+fallthrough = false
+
+[[rules]]
+type = "Data"
+globs = []
+fallthrough = false
+
 [[kv_namespaces]]
 binding = "KV"
 id = "4d068898a6ba4ef38c6a7f04a414b4fd"
