@@ -10,7 +10,7 @@ pattern = "g5gx9c.nocal.host"
 custom_domain = true
 
 [[routes]]
-pattern = "g5gx9c.nocal.host/*"
+pattern = "g5gx9c.nocal.host/__edgetunnel_route_probe_only/*"
 zone_name = "nocal.host"
 
 [[kv_namespaces]]
