@@ -1,11 +1,11 @@
 # Production replacement: original hostname only; public aliases remain disabled.
 name = "edgetunnel-recovery-20261016"
-main = "probe-only.js"
+main = "entry.js"
 compatibility_date = "2025-11-04"
 keep_vars = true
 workers_dev = false
 preview_urls = false
-find_additional_modules = false
+find_additional_modules = true
 
 [[rules]]
 type = "ESModule"
@@ -37,10 +37,6 @@ pattern = "g5gx9c.nocal.host"
 custom_domain = true
 enabled = true
 previews_enabled = false
-
-[[routes]]
-pattern = "g5gx9c.nocal.host/__edgetunnel_entry_probe_20261016"
-zone_name = "nocal.host"
 
 [[kv_namespaces]]
 binding = "KV"
