@@ -1,5 +1,7 @@
 const Version = '2026-07-11 19:02:35';
 let config_JSON, 缓存SOCKS5白名单 = null, 调试日志打印 = false;
+const 用户UUID正则 = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
+let 用户ID派生缓存 = null;
 let SOCKS5白名单 = ['*tapecontent.net', '*cloudatacdn.com', '*loadshare.org', '*cdn-centaurus.com', 'scholar.google.com'];
 const Pages静态页面 = 'https://edt-pages.github.io';
 ///////////////////////////////////////////////////////全局常量和工具函数///////////////////////////////////////////////
@@ -28,10 +30,8 @@ export default {
 		const upgradeHeader = (request.headers.get('Upgrade') || '').toLowerCase(), contentType = (request.headers.get('content-type') || '').toLowerCase();
 		const 管理员密码 = env.ADMIN || env.admin || env.PASSWORD || env.password || env.pswd || env.TOKEN || env.KEY || env.UUID || env.uuid;
 		const 加密秘钥 = env.KEY || '勿动此默认密钥，有需求请自行通过添加变量KEY进行修改';
-		const userIDMD5 = await MD5MD5(管理员密码 + 加密秘钥);
-		const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
-		const envUUID = env.UUID || env.uuid;
-		const userID = (envUUID && uuidRegex.test(envUUID)) ? envUUID.toLowerCase() : [userIDMD5.slice(0, 8), userIDMD5.slice(8, 12), '4' + userIDMD5.slice(13, 16), '8' + userIDMD5.slice(17, 20), userIDMD5.slice(20)].join('-');
+		const userID = await 获取用户ID(env.UUID || env.uuid, 管理员密码, 加密秘钥);
+		const uuidRegex = 用户UUID正则;
 		const hosts = env.HOST ? (await 整理成数组(env.HOST)).map(h => h.toLowerCase().replace(/^https?:\/\//, '').split('/')[0].split(':')[0]) : [url.hostname];
 		const host = hosts[0];
 		const 访问路径 = url.pathname.slice(1).toLowerCase();
@@ -1992,10 +1992,15 @@ async function forwardataTCP(host, portNum, rawData, ws, respHeader, remoteConnW
 	const 木马反代握手数据 = 使用木马反代 ? 提取木马反代握手数据(木马反代首包数据, rawData) : null;
 
 	async function 等待连接建立(remoteSock, timeoutMs = 连接超时毫秒) {
-		await Promise.race([
-			remoteSock.opened,
-			new Promise((_, reject) => setTimeout(() => reject(new Error('连接超时')), timeoutMs))
-		]);
+		let timeoutId;
+		try {
+			await Promise.race([
+				remoteSock.opened,
+				new Promise((_, reject) => { timeoutId = setTimeout(() => reject(new Error('连接超时')), timeoutMs) })
+			]);
+		} finally {
+			if (timeoutId !== undefined) clearTimeout(timeoutId);
+		}
 	}
 
 	async function 打开TCP连接(address, port) {
@@ -2504,7 +2509,8 @@ function 创建下行Grain发送器(webSocket, headerData = null) {
 		flushTimer = null;
 		microtaskQueued = false;
 		if (!pendingBytes) return;
-		const output = pendingBuffer.subarray(0, pendingBytes).slice();
+		// 移交旧缓冲区的视图；后续写入只使用新缓冲区，避免发送前再次复制。
+		const output = pendingBuffer.subarray(0, pendingBytes);
 		pendingBuffer = new Uint8Array(packetCap);
 		pendingBytes = 0;
 		waitRounds = 0;
@@ -4879,6 +4885,22 @@ function 掩码敏感信息(文本, 前缀长度 = 3, 后缀长度 = 2) {
 	const 星号数量 = 文本.length - 前缀长度 - 后缀长度;
 
 	return `${前缀}${'*'.repeat(星号数量)}${后缀}`;
+}
+
+// 仅缓存当前配置的身份派生任务，合并并发请求；凭据变化或计算失败后重新派生。
+async function 获取用户ID(envUUID, 管理员密码, 加密秘钥) {
+	if (envUUID && 用户UUID正则.test(envUUID)) return envUUID.toLowerCase();
+	const seed = 管理员密码 + 加密秘钥;
+	if (用户ID派生缓存?.seed === seed) return 用户ID派生缓存.promise;
+	const entry = { seed, promise: null };
+	entry.promise = MD5MD5(seed).then(hash => [
+		hash.slice(0, 8), hash.slice(8, 12), '4' + hash.slice(13, 16), '8' + hash.slice(17, 20), hash.slice(20)
+	].join('-')).catch(error => {
+		if (用户ID派生缓存 === entry) 用户ID派生缓存 = null;
+		throw error;
+	});
+	用户ID派生缓存 = entry;
+	return entry.promise;
 }
 
 async function MD5MD5(文本) {
