@@ -2,14 +2,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 // Install Miniflare locally or set EDGETUNNEL_MINIFLARE_MODULE to its absolute module path.
-const { Miniflare } = await import(process.env.EDGETUNNEL_MINIFLARE_MODULE || 'miniflare');
+const runtime = await import(process.env.EDGETUNNEL_MINIFLARE_MODULE || 'miniflare');
 
 const source=fs.readFileSync(new URL('../_worker.js', import.meta.url),'utf8');
 const password='local-test-password', key='local-test-key';
 const first=createHash('md5').update(password+key).digest('hex');
 const hash=createHash('md5').update(first.slice(7,27)).digest('hex');
 const derived=[hash.slice(0,8),hash.slice(8,12),'4'+hash.slice(13,16),'8'+hash.slice(17,20),hash.slice(20)].join('-');
-const mf=new Miniflare({
+const runtimeOptions={
 	modules:true, compatibilityDate:'2025-11-04', cf:false,
 	bindings:{ADMIN:password, KEY:key},
 	script:source.replace('export default {','const originalWorker = {')+`
@@ -29,7 +29,8 @@ export default {
 		return new Response(null,{status:101,webSocket:client});
 	}
 };`,
-});
+};
+const mf=new runtime.Miniflare(runtime.convertV4MiniflareOptions ? runtime.convertV4MiniflareOptions(runtimeOptions) : runtimeOptions);
 try {
 	for(let i=0;i<10;i++) {
 		const response=await mf.dispatchFetch(`https://worker.example/__local_version?uuid=${derived}`);
