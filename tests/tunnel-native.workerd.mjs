@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import net from 'node:net';
 const runtime = await import(process.env.EDGETUNNEL_MINIFLARE_MODULE || 'miniflare');
-const source = fs.readFileSync(new URL('../_worker.js', import.meta.url), 'utf8');
+const source = fs.readFileSync(process.env.EDGETUNNEL_TEST_SCRIPT || new URL('../_worker.js', import.meta.url), 'utf8');
 const uuid = '12345678-1234-4abc-8def-123456789abc';
 const sockets = new Set();
 let accepted = 0;
