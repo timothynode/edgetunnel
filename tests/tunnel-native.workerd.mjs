@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import net from 'node:net';
+import path from 'node:path';
 const runtime = await import(process.env.EDGETUNNEL_MINIFLARE_MODULE || 'miniflare');
-const source = fs.readFileSync(process.env.EDGETUNNEL_TEST_SCRIPT || new URL('../_worker.js', import.meta.url), 'utf8');
+const source = fs.readFileSync(new URL('../_worker.js', import.meta.url), 'utf8');
 const uuid = '12345678-1234-4abc-8def-123456789abc';
 const sockets = new Set();
 let accepted = 0;
@@ -17,7 +18,10 @@ await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const port = server.address().port;
 const runtimeOptions = {
 	modules: true, cf: false, compatibilityDate: '2025-11-04',
-	bindings: { UUID: uuid }, script: source,
+	bindings: { UUID: uuid },
+	...(process.env.EDGETUNNEL_TEST_SCRIPT
+		? { modulesRoot: path.dirname(process.env.EDGETUNNEL_TEST_SCRIPT), modules: [process.env.EDGETUNNEL_TEST_SCRIPT, path.join(path.dirname(process.env.EDGETUNNEL_TEST_SCRIPT), '_worker.js')].filter(file => fs.existsSync(file)).map(file => ({ type: 'ESModule', path: file, contents: fs.readFileSync(file, 'utf8') })) }
+		: { script: source }),
 };
 const mf = new runtime.Miniflare(runtime.convertV4MiniflareOptions
 	? runtime.convertV4MiniflareOptions(runtimeOptions) : runtimeOptions);

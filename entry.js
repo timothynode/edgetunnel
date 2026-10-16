@@ -3,7 +3,7 @@ export default {
 	async fetch(request, env, ctx) {
 		const path = new URL(request.url).pathname;
 		if (request.method === 'GET' && (path === '/__edgetunnel_entry_probe_20261016' || path === '/__edgetunnel_route_probe_only/entry')) {
-			return new Response('entry-ok', { headers: { 'Cache-Control': 'no-store', 'Content-Type': 'text/plain;charset=utf-8', 'X-EdgeTunnel-Bootstrap': 'lazy-v1' } });
+			return new Response('entry-ok', { headers: { 'Cache-Control': 'no-store', 'Content-Type': 'text/plain;charset=utf-8', 'X-EdgeTunnel-Bootstrap': 'lazy-v2-module' } });
 		}
 		try {
 			const { default: worker } = await import('./_worker.js');
