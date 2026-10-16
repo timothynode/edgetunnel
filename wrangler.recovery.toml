@@ -1,11 +1,10 @@
-# Prepared recovery instance; no public URL, domain, or route is enabled here.
+# Production replacement: original hostname only; public aliases remain disabled.
 name = "edgetunnel-recovery-20261016"
 main = "entry.js"
 compatibility_date = "2025-11-04"
 keep_vars = true
 workers_dev = false
 preview_urls = false
-routes = []
 find_additional_modules = true
 
 [[rules]]
@@ -32,6 +31,10 @@ fallthrough = false
 type = "Data"
 globs = []
 fallthrough = false
+
+[[routes]]
+pattern = "g5gx9c.nocal.host"
+custom_domain = true
 
 [[kv_namespaces]]
 binding = "KV"
