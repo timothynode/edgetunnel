@@ -5,6 +5,12 @@ keep_vars = true
 workers_dev = false
 preview_urls = false
 
+[[routes]]
+pattern = "g5gx9c.nocal.host"
+custom_domain = true
+enabled = true
+previews_enabled = false
+
 [[kv_namespaces]]
 binding = "KV"			#KV绑定名默认不可修改
 id = "4d068898a6ba4ef38c6a7f04a414b4fd"
