@@ -4891,16 +4891,17 @@ function 掩码敏感信息(文本, 前缀长度 = 3, 后缀长度 = 2) {
 async function 获取用户ID(envUUID, 管理员密码, 加密秘钥) {
 	if (envUUID && 用户UUID正则.test(envUUID)) return envUUID.toLowerCase();
 	const seed = 管理员密码 + 加密秘钥;
-	if (用户ID派生缓存?.seed === seed) return 用户ID派生缓存.promise;
-	const entry = { seed, promise: null };
-	entry.promise = MD5MD5(seed).then(hash => [
-		hash.slice(0, 8), hash.slice(8, 12), '4' + hash.slice(13, 16), '8' + hash.slice(17, 20), hash.slice(20)
-	].join('-')).catch(error => {
-		if (用户ID派生缓存 === entry) 用户ID派生缓存 = null;
-		throw error;
-	});
-	用户ID派生缓存 = entry;
-	return entry.promise;
+	let entry = 用户ID派生缓存;
+	if (!entry || entry.seed !== seed) {
+		entry = { seed, id: null };
+		用户ID派生缓存 = entry;
+	}
+	if (entry.id !== null) return entry.id;
+	// Pending work belongs to its request; cache only the completed identity.
+	const hash = await MD5MD5(seed);
+	const id = [hash.slice(0, 8), hash.slice(8, 12), '4' + hash.slice(13, 16), '8' + hash.slice(17, 20), hash.slice(20)].join('-');
+	if (用户ID派生缓存 === entry) entry.id = id;
+	return id;
 }
 
 async function MD5MD5(文本) {

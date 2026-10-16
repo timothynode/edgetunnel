@@ -64,14 +64,33 @@ test('derived identity remains byte-for-byte compatible and warm calls reuse its
 	assert.equal(w.digestCalls, 2);
 });
 
-test('simultaneous cold requests share one derivation', async () => {
+test('cold requests derive independently and then reuse only completed identities', async () => {
 	const gate = deferred();
 	const w = loadWorker({ beforeDigest: () => gate.promise });
 	const requests = Array.from({ length: 32 }, () => w.id(null, 'password', 'key'));
-	assert.equal(w.digestCalls, 1);
+	assert.equal(w.digestCalls, 32);
 	gate.resolve();
 	assert.deepEqual(await Promise.all(requests), Array(32).fill(legacyID('password', 'key')));
-	assert.equal(w.digestCalls, 2);
+	assert.equal(w.digestCalls, 64);
+	assert.equal(await w.id(null, 'password', 'key'), legacyID('password', 'key'));
+	assert.equal(w.digestCalls, 64);
+});
+
+test('a hung or cancelled cold request cannot block later requests with the same credentials', async () => {
+	const orphan = deferred();
+	const w = loadWorker({ beforeDigest(call) { if (call === 1) return orphan.promise; } });
+	const cancelled = assert.rejects(w.id(null, 'password', 'key'), { message: 'request cancelled' });
+	let deadline;
+	try {
+		assert.equal(await Promise.race([
+			w.id(null, 'password', 'key'),
+			new Promise((_, reject) => { deadline = setTimeout(() => reject(new Error('later request blocked by orphan')), 200); }),
+		]), legacyID('password', 'key'));
+	} finally { clearTimeout(deadline); orphan.reject(new Error('request cancelled')); }
+	await cancelled;
+	const calls = w.digestCalls;
+	assert.equal(await w.id(null, 'password', 'key'), legacyID('password', 'key'));
+	assert.equal(w.digestCalls, calls, 'late failure must preserve a completed cache value');
 });
 
 test('password and key changes invalidate the bounded identity cache', async () => {
@@ -82,7 +101,7 @@ test('password and key changes invalidate the bounded identity cache', async () 
 	assert.equal(w.digestCalls, 8);
 });
 
-test('failed derivation is evicted so subsequent requests recover', async () => {
+test('failed derivation does not poison subsequent requests', async () => {
 	const w = loadWorker({ beforeDigest(call) { if (call === 1) throw new Error('digest failed'); } });
 	await assert.rejects(w.id(null, 'p', 'k'), { message: 'digest failed' });
 	assert.equal(await w.id(null, 'p', 'k'), legacyID('p', 'k'));
