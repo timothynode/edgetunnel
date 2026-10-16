@@ -8,8 +8,6 @@ preview_urls = false
 [[routes]]
 pattern = "g5gx9c.nocal.host"
 custom_domain = true
-enabled = true
-previews_enabled = false
 
 [[routes]]
 pattern = "g5gx9c.nocal.host/*"
@@ -18,3 +16,7 @@ zone_name = "nocal.host"
 [[kv_namespaces]]
 binding = "KV"			#KV绑定名默认不可修改
 id = "4d068898a6ba4ef38c6a7f04a414b4fd"
+
+[observability]
+enabled = true
+head_sampling_rate = 1
